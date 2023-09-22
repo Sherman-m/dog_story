@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <random>
 #include <stdexcept>
 #include <unordered_map>
@@ -9,7 +10,6 @@
 #include "../util/tagged.h"
 #include "building.h"
 #include "geometry.h"
-#include "lost_object.h"
 #include "office.h"
 #include "road.h"
 
@@ -21,9 +21,11 @@ class Map {
   using Roads = std::vector<Road>;
   using Buildings = std::vector<Building>;
   using Offices = std::vector<Office>;
+  using Milliseconds = std::chrono::milliseconds;
 
   Map(Id id, std::string name, const Speed& dog_speed,
-      std::uint32_t num_of_loot_types, std::uint32_t bag_capacity) noexcept;
+      std::uint32_t num_of_loot_types, std::uint32_t bag_capacity,
+      Milliseconds dog_retirement_time);
 
   const Id& GetId() const noexcept;
 
@@ -37,12 +39,14 @@ class Map {
 
   Speed GetDogSpeed() const noexcept;
 
+  Milliseconds GetDogRetirementTime() const noexcept;
+
   std::uint32_t GetBagCapacity() const noexcept;
 
   // Находит дорогу, на которую может перейти собака, исходя из ее координат
   // начала и конца движения.
   std::pair<Point, const Road*> GetRoadFromTo(const Point& from,
-                                              const Point& to) const noexcept;
+                                              const Point& to) const;
 
   void AddRoad(const Road& target_road);
 
@@ -77,6 +81,7 @@ class Map {
   Id id_;
   std::string name_;
   Speed dog_speed_{1.0, 1.0};
+  Milliseconds dog_retirement_time_;
   Roads roads_;
   RoadIntersectionPoints road_intersection_points_;
   Buildings buildings_;

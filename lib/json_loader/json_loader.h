@@ -1,6 +1,7 @@
 #pragma once
 
 #include <boost/json.hpp>
+#include <chrono>
 
 #include "../model/model.h"
 #include "../util/file_handler.h"
@@ -9,6 +10,8 @@
 namespace json_loader {
 
 namespace json = boost::json;
+
+using Seconds = std::chrono::seconds;
 
 using namespace std::literals;
 
@@ -33,7 +36,8 @@ model::Office DeserializeOffice(const json::value& json_office);
 model::Map DeserializeMap(const json::object& json_map,
                           model::Speed& default_dog_speed,
                           std::uint32_t num_of_loot_types,
-                          std::uint32_t default_bag_capacity);
+                          std::uint32_t default_bag_capacity,
+                          Seconds dog_retirement_time);
 
 // Получает путь к конфигурационному файлу config.json, содержащий информацию
 // об объектах игры. Создает хранилище для типов потерянных объектов

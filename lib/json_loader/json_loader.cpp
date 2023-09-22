@@ -49,7 +49,8 @@ model::Office DeserializeOffice(const json::value& json_office) {
 model::Map DeserializeMap(const json::object& json_map,
                           model::Speed& default_dog_speed,
                           std::uint32_t num_of_loot_types,
-                          std::uint32_t default_bag_capacity) {
+                          std::uint32_t default_bag_capacity,
+                          Seconds dog_retirement_time) {
   if (const auto& dog_speed = json_map.if_contains("dogSpeed"s)) {
     default_dog_speed =
         model::Speed(static_cast<float>(dog_speed->as_double()),
@@ -61,7 +62,8 @@ model::Map DeserializeMap(const json::object& json_map,
   }
   model::Map::Id map_id(JsonObjectToString(json_map.at("id"s)));
   model::Map map(map_id, JsonObjectToString(json_map.at("name"s)),
-                 default_dog_speed, num_of_loot_types, default_bag_capacity);
+                 default_dog_speed, num_of_loot_types, default_bag_capacity,
+                 dog_retirement_time);
   for (const auto& map_road : json_map.at("roads"s).as_array()) {
     try {
       model::Road road = DeserializeRoad(map_road);
@@ -108,11 +110,17 @@ model::Game LoadGame(const std::filesystem::path& json_path) {
       json_content.at("lootGeneratorConfig"s).as_object();
 
   model::LootGenerator loot_generator(
-      std::chrono::milliseconds(
+      Seconds(
           static_cast<long>(loot_generator_config.at("period"s).as_double())),
       loot_generator_config.at("probability"s).as_double());
 
   model::Game game(std::move(loot_generator));
+  Seconds default_dog_retirement_time(60);
+  if (const auto& dog_retirement_time =
+          json_content.if_contains("dogRetirementTime"s)) {
+    default_dog_retirement_time =
+        Seconds(static_cast<long>(dog_retirement_time->as_double()));
+  }
   for (const auto& json_map : json_content.at("maps"s).as_array()) {
     model::Speed default_dog_speed(1.0, 1.0);
     if (const auto& dog_speed = json_content.if_contains("defaultDogSpeed"s)) {
@@ -128,7 +136,8 @@ model::Game LoadGame(const std::filesystem::path& json_path) {
             static_cast<std::uint32_t>(bag_capacity->as_uint64());
       }
       model::Map map = DeserializeMap(json_map.as_object(), default_dog_speed,
-                                      loot_types.size(), default_bag_capacity);
+                                      loot_types.size(), default_bag_capacity,
+                                      default_dog_retirement_time);
       LootTypesStorage::AddTypesOfLoots(map.GetId(), loot_types);
       game.AddMap(std::move(map));
     } catch (const std::exception& e) {

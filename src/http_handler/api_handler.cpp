@@ -5,26 +5,32 @@ namespace http_handler {
 // Если application->IsTickerSet() == false, то добавляется дополнительный
 // обработчик тиков (используется при обращении к /api/v1/game/tick).
 ApiHandler::ApiHandler(std::shared_ptr<app::Application> application,
-                       bool randomize_spawn_points)
+                       bool randomize_spawn_points, bool is_ticker_set)
     : application_(std::move(application)),
-      randomize_spawn_points_(randomize_spawn_points) {
+      randomize_spawn_points_(randomize_spawn_points),
+      is_ticker_set_(is_ticker_set) {
   handler_storage_[std::string(endpoint_storage::kApiV1Map)] =
-      std::make_any<HandlerSignature>(&ApiHandler::HandleMapEndpoint);
+      &ApiHandler::HandleMapEndpoint;
   handler_storage_[std::string(endpoint_storage::kApiV1Maps)] =
-      std::make_any<HandlerSignature>(&ApiHandler::HandleMapsEndpoint);
+      &ApiHandler::HandleMapsEndpoint;
   handler_storage_[std::string(endpoint_storage::kApiV1GameJoin)] =
-      std::make_any<HandlerSignature>(&ApiHandler::HandleJoinEndpoint);
+      &ApiHandler::HandleJoinEndpoint;
   handler_storage_[std::string(endpoint_storage::kApiV1GamePlayers)] =
-      std::make_any<HandlerSignature>(&ApiHandler::HandlePlayersEndpoint);
+      &ApiHandler::HandlePlayersEndpoint;
   handler_storage_[std::string(endpoint_storage::kApiV1GameState)] =
-      std::make_any<HandlerSignature>(&ApiHandler::HandleStateEndpoint);
+      &ApiHandler::HandleStateEndpoint;
   handler_storage_[std::string(endpoint_storage::kApiV1GamePlayerAction)] =
-      std::make_any<HandlerSignature>(&ApiHandler::HandleActionEndpoint);
-
-  if (!application_->IsTickerSet()) {
+      &ApiHandler::HandleActionEndpoint;
+  handler_storage_[std::string(endpoint_storage::kApiV1GameRecords)] =
+      &ApiHandler::HandleRecordsEndpoint;
+  if (!is_ticker_set_) {
     handler_storage_[std::string(endpoint_storage::kApiV1GameTick)] =
-        std::make_any<HandlerSignature>(&ApiHandler::HandleTickEndpoint);
+        &ApiHandler::HandleTickEndpoint;
   }
+}
+
+std::string ApiHandler::ClearTarget(std::string_view target) {
+  return std::string(target.substr(0, target.rfind('?')));
 }
 
 std::pair<ApiHandler::StringResponse, const app::Player*>
@@ -79,7 +85,7 @@ std::pair<ApiHandler::StringResponse, json::value> ApiHandler::ParseJoinData(
     error_message = std::move(
         ApiBadRequest(ApiSerializer::SerializeError(
                           common_response_codes::kInvalidArgument,
-                          "Failed to parse the request to join the game"sv),
+                          "Failed to parse the join the game request JSON"sv),
                       http_version, keep_alive));
     return std::make_pair(error_message, json::value());
   }
@@ -120,7 +126,7 @@ std::pair<ApiHandler::StringResponse, json::value> ApiHandler::ParseActionData(
     error_message = std::move(
         ApiBadRequest(ApiSerializer::SerializeError(
                           common_response_codes::kInvalidArgument,
-                          "Failed to parse the request to join the game"sv),
+                          "Failed to parse the action request JSON"sv),
                       http_version, keep_alive));
     return std::make_pair(error_message, json::value());
   }
@@ -129,13 +135,45 @@ std::pair<ApiHandler::StringResponse, json::value> ApiHandler::ParseActionData(
       (!std::regex_match(json_loader::JsonObjectToString(*movement),
                          std::regex("[LRUD]"s)) &&
        !movement->as_string().empty())) {
-    error_message = std::move(ApiBadRequest(
-        ApiSerializer::SerializeError(common_response_codes::kInvalidArgument,
-                                      "Failed to parse action"sv),
-        http_version, keep_alive));
+    error_message = std::move(
+        ApiBadRequest(ApiSerializer::SerializeError(
+                          common_response_codes::kInvalidArgument,
+                          "Failed to parse the action request JSON"sv),
+                      http_version, keep_alive));
     return std::make_pair(error_message, json::value());
   }
   return std::make_pair(error_message, json_request_content);
+}
+
+std::pair<ApiHandler::StringResponse, json::object>
+ApiHandler::ParseRecordsData(const StringRequest& req,
+                             std::uint32_t http_version,
+                             bool keep_alive) const {
+  StringResponse error_message;
+  std::string_view target = req.target();
+  json::object request_data;
+  auto param_pos = target.find("start"sv, target.find('?'));
+  request_data["start"s] =
+      (param_pos != std::string_view::npos)
+          ? std::stoi(
+                std::string(target.begin() + target.find('=', param_pos) + 1,
+                            target.begin() + target.find('&', param_pos)))
+          : 0;
+  param_pos = target.find("maxItems"sv, param_pos);
+  request_data["maxItems"s] =
+      (param_pos != std::string_view::npos)
+          ? std::stoi(std::string(
+                target.begin() + target.find('=', param_pos) + 1, target.end()))
+          : 50;
+  if (request_data["maxItems"s].as_int64() > 100) {
+    error_message = std::move(
+        ApiBadRequest(ApiSerializer::SerializeError(
+                          common_response_codes::kInvalidArgument,
+                          "Failed to parse records request parameters"sv),
+                      http_version, keep_alive));
+    return std::make_pair(error_message, json::object());
+  }
+  return std::make_pair(error_message, request_data);
 }
 
 std::pair<ApiHandler::StringResponse, json::value> ApiHandler::ParseTickData(
@@ -164,8 +202,9 @@ std::pair<ApiHandler::StringResponse, json::value> ApiHandler::ParseTickData(
 }
 
 std::pair<ApiHandler::StringResponse, model::GameSession*>
-ApiHandler::FindGameSession(const model::Map::Id& map_id,
-                            std::uint32_t http_version, bool keep_alive) {
+ApiHandler::FindFirstGameSessionByMapId(const model::Map::Id& map_id,
+                                        std::uint32_t http_version,
+                                        bool keep_alive) {
   StringResponse error_message;
   auto game_session = application_->GetGameSessionByMapId(map_id);
   if (!game_session) {
@@ -180,6 +219,24 @@ ApiHandler::FindGameSession(const model::Map::Id& map_id,
     }
   }
   return std::make_pair(error_message, game_session);
+}
+
+std::pair<ApiHandler::StringResponse, const app::Player*>
+ApiHandler::FindPlayerByMapIdAndUsername(const model::Map::Id& map_id,
+                                         const std::string& username,
+                                         std::uint32_t http_version,
+                                         bool keep_alive) {
+  StringResponse error_message;
+  if (auto player =
+          application_->GetPlayerByMapIdAndDogName(map_id, username)) {
+    return std::make_pair(error_message, player);
+  }
+  error_message =
+      std::move(ApiBadRequest(ApiSerializer::SerializeError(
+                                  common_response_codes::kInvalidArgument,
+                                  "Failed to find player with this username"sv),
+                              http_version, keep_alive));
+  return std::make_pair(error_message, nullptr);
 }
 
 ApiHandler::StringResponse ApiHandler::HandleMapEndpoint(
@@ -207,10 +264,26 @@ ApiHandler::StringResponse ApiHandler::HandleMapEndpoint(
 
 ApiHandler::StringResponse ApiHandler::HandleMapsEndpoint(
     ApiHandler::StringRequest&& req) {
+  std::uint32_t http_version = req.version();
+  bool keep_alive = req.keep_alive();
+
+  if (auto check_http_method_response = CheckHttpMethod(
+          req.method(),
+          std::vector<http::verb>{http::verb::get, http::verb::head},
+          http_version, keep_alive);
+      check_http_method_response.result() == http::status::method_not_allowed) {
+    return check_http_method_response;
+  }
   return ApiOkRequest(ApiSerializer::SerializeMaps(application_->GetMaps()),
-                      req.version(), req.keep_alive());
+                      http_version, keep_alive);
 }
 
+// В процессе подключения к игре пытается найти такого игрока, который участвует
+// в игровой сессии с id карты, равным веденному пользователем map_id, и имя
+// которого совпадает с именем персонажа, равным введенному пользователем
+// user_name.
+// В случае успеха пользователь подключается в качестве найденного игрока.
+// В случае неудачи пользователь подключается в качестве нового игрока.
 ApiHandler::StringResponse ApiHandler::HandleJoinEndpoint(
     ApiHandler::StringRequest&& req) {
   std::uint32_t http_version = req.version();
@@ -231,17 +304,24 @@ ApiHandler::StringResponse ApiHandler::HandleJoinEndpoint(
   model::Map::Id map_id(json_loader::JsonObjectToString(
       parse_user_data_response.second.at("mapId"s)));
   if (auto map = application_->GetMapById(map_id)) {
+    if (auto find_player_response = FindPlayerByMapIdAndUsername(
+            map_id, user_name, http_version, keep_alive);
+        find_player_response.first.result() != http::status::bad_request) {
+      return ApiOkRequest(
+          ApiSerializer::SerializeJoinResponse(find_player_response.second),
+          http_version, keep_alive);
+    }
     auto find_game_session_response =
-        FindGameSession(map_id, http_version, keep_alive);
+        FindFirstGameSessionByMapId(map_id, http_version, keep_alive);
     if (find_game_session_response.first.result() ==
         http::status::internal_server_error) {
       return find_game_session_response.first;
     }
-    if (auto join_response = application_->JoinToGameSession(
+    if (auto player = application_->JoinToGameSession(
             user_name, find_game_session_response.second->GetId(),
             map->GenerateRandomPosition(randomize_spawn_points_));
-        join_response.second) {
-      return ApiOkRequest(ApiSerializer::SerializeJoinResponse(join_response),
+        player) {
+      return ApiOkRequest(ApiSerializer::SerializeJoinResponse(player),
                           http_version, keep_alive);
     } else {
       return ApiInternalServerError(
@@ -275,7 +355,8 @@ ApiHandler::StringResponse ApiHandler::HandlePlayersEndpoint(
   }
   if (auto game_session =
           application_->GetGameSessionById(player.second->GetGameSessionId())) {
-    auto players = application_->GetPlayersInSession(game_session->GetId());
+    auto players =
+        application_->GetPlayersByGameSessionId(game_session->GetId());
     return ApiOkRequest(
         ApiSerializer::SerializePlayersInGameSession(game_session, players),
         http_version, keep_alive);
@@ -305,7 +386,8 @@ ApiHandler::StringResponse ApiHandler::HandleStateEndpoint(
   auto game_session =
       application_->GetGameSessionById(player.second->GetGameSessionId());
   if (game_session) {
-    auto players = application_->GetPlayersInSession(game_session->GetId());
+    auto players =
+        application_->GetPlayersByGameSessionId(game_session->GetId());
     return ApiOkRequest(ApiSerializer::SerializeState(game_session, players),
                         http_version, keep_alive);
   }
@@ -348,6 +430,30 @@ ApiHandler::StringResponse ApiHandler::HandleActionEndpoint(
       http_version, keep_alive);
 }
 
+ApiHandler::StringResponse ApiHandler::HandleRecordsEndpoint(
+    StringRequest&& req) {
+  std::uint32_t http_version = req.version();
+  bool keep_alive = req.keep_alive();
+
+  if (auto check_http_method_response = CheckHttpMethod(
+          req.method(),
+          std::vector<http::verb>{http::verb::get, http::verb::head},
+          http_version, keep_alive);
+      check_http_method_response.result() == http::status::method_not_allowed) {
+    return check_http_method_response;
+  }
+  auto parse_records_data_response =
+      ParseRecordsData(req, http_version, keep_alive);
+  if (parse_records_data_response.first.result() == http::status::bad_request) {
+    return parse_records_data_response.first;
+  }
+  auto retired_dogs = application_->GetRetiredPlayers(
+      parse_records_data_response.second.at("start"s).as_int64(),
+      parse_records_data_response.second.at("maxItems"s).as_int64());
+  return ApiOkRequest(ApiSerializer::SerializeRecordsResponse(retired_dogs),
+                      http_version, keep_alive);
+}
+
 ApiHandler::StringResponse ApiHandler::HandleTickEndpoint(
     ApiHandler::StringRequest&& req) {
   std::uint32_t http_version = req.version();
@@ -365,7 +471,8 @@ ApiHandler::StringResponse ApiHandler::HandleTickEndpoint(
   }
   std::chrono::milliseconds time_delta(
       parse_tick_data_response.second.at("timeDelta"s).as_int64());
-  if (application_->UpdateAllGameSessions(time_delta)) {
+  if (application_->UpdateAllGameSessions(time_delta) &&
+      application_->SaveGameState()) {
     return ApiOkRequest(json::serialize(json::object()), http_version,
                         keep_alive);
   }

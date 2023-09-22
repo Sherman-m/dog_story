@@ -30,6 +30,7 @@ class Tagged {
   using ValueType = Value;
   using TagType = Tag;
 
+  Tagged() = default;
   explicit Tagged(Value&& v) : value_(std::move(v)) {}
   explicit Tagged(const Value& v) : value_(v) {}
 

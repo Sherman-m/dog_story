@@ -2,14 +2,15 @@
 
 namespace model {
 
-// Вызывает внутри себя bag_.reserve(bag_capacity)
+// Вызывает внутри себя bag_.reserve(bag_capacity_)
 Dog::Dog(Id id, std::string name, const std::pair<Point, const Road*>& pos,
          std::uint32_t bag_capacity)
     : id_(id),
       name_(std::move(name)),
       curr_pos_(pos.first),
-      curr_road_(*pos.second) {
-  bag_.reserve(bag_capacity);
+      curr_road_(*pos.second),
+      bag_capacity_(bag_capacity) {
+  bag_.reserve(bag_capacity_);
 }
 
 const Dog::Id& Dog::GetId() const noexcept { return id_; }
@@ -28,19 +29,53 @@ Direction Dog::GetDirection() const noexcept { return direction_; }
 
 Road Dog::GetCurrentRoad() const noexcept { return curr_road_; }
 
-const Dog::Bag& Dog::GetBag() const noexcept { return bag_; }
+std::uint32_t Dog::GetBagCapacity() const noexcept { return bag_capacity_; }
 
-std::uint32_t Dog::GetScore() const noexcept { return score_; }
+const Dog::Bag& Dog::GetBag() const noexcept { return bag_; }
 
 // Показателем, что рюкзак заполнен, является условие
 // bag_.size() == bag_.capacity().
 bool Dog::PutInBag(const model::LostObject& lost_object) {
-  if (bag_.size() == bag_.capacity()) {
+  if (bag_.size() == bag_capacity_) {
     return false;
   }
   bag_.push_back(lost_object);
   return true;
 }
+
+void Dog::HandOverLoot() {
+  if (bag_.empty()) {
+    return;
+  }
+  std::uint32_t points = 0;
+  for (auto& lost_object : bag_) {
+    points += lost_object.GetValue();
+  }
+  AddScore(points);
+  bag_.clear();
+}
+
+Dog::Milliseconds Dog::GetTimeInGame() const noexcept {
+  return time_in_game_;
+}
+
+void Dog::AddTimeInGame(model::Dog::Milliseconds time_delta) {
+  time_in_game_ += time_delta;
+}
+
+Dog::Milliseconds Dog::GetIdleTime() const noexcept { return idle_time_; }
+
+void Dog::AddIdleTime(Milliseconds time_delta) { idle_time_ += time_delta; }
+
+void Dog::ResetIdleTime() { idle_time_ = Milliseconds(0); }
+
+bool Dog::IsMovingNow() const noexcept {
+  return speed_.sx != 0 || speed_.sy != 0;
+}
+
+std::uint32_t Dog::GetScore() const noexcept { return score_; }
+
+void Dog::AddScore(std::uint32_t points) { score_ += points; }
 
 // Находит next_pos собаки и обрабатывает ситуации ее расположения:
 //  - Если next_pos находится в пределах curr_road_, то собака просто
@@ -74,18 +109,6 @@ void Dog::UpdatePosition(const Map* map, Milliseconds time_delta) {
   }
 }
 
-void Dog::HandOverLoot() {
-  if (bag_.empty()) {
-    return;
-  }
-  std::uint32_t points = 0;
-  for (auto& lost_object : bag_) {
-    points += lost_object.GetValue();
-  }
-  score_ += points;
-  bag_.clear();
-}
-
 void Dog::SetSpeed(const Speed& speed) { speed_ = speed; }
 
 void Dog::SetDirection(const Direction& direction) { direction_ = direction; }
@@ -101,6 +124,7 @@ void Dog::SetBoundaries(const Point& unchanged_point,
                         const std::pair<Point, Point>& pos) {
   auto half_road_width = curr_road_.GetWidth() / 2;
   SetSpeed(Speed(0, 0));
+  ResetIdleTime();
   switch (direction_) {
     case Direction::kNorth:
       SetPosition(Point(unchanged_point.x,

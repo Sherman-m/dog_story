@@ -21,7 +21,7 @@ class StrandStorage {
 
   const Strand* GetStrand(
       const model::GameSession::Id& game_session_id) const noexcept;
-  const Strand* AddStrand(const model::GameSession::Id& game_session_id);
+  void AddStrand(const model::GameSession::Id& game_session_id);
 
  private:
   using GameSessionToStrand =

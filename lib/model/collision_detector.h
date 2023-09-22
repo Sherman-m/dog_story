@@ -42,7 +42,7 @@ enum class CollisionEventType : char { kCollect = 'C', kPass = 'P' };
 
 // Описывает событие столкновения.
 struct CollisionEvent {
-  using LostObjectPosition = std::list<LostObject>::iterator;
+  using LostObjectPosition = LostObject::Loot::iterator;
   // Создает объект CollisionEvent.
   //
   // Если тип столкновения равен kPass, то lost_object_ptr должен быть равен

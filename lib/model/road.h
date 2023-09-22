@@ -19,6 +19,7 @@ class Road {
   constexpr static HorizontalTag HORIZONTAL{};
   constexpr static VerticalTag VERTICAL{};
 
+  Road() = default;
   explicit Road(HorizontalTag, const Point& start_pos,
                 Coord end_pos_x) noexcept;
   explicit Road(VerticalTag, const Point& start_pos, Coord end_pos_y) noexcept;

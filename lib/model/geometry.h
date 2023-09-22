@@ -7,6 +7,9 @@
 
 namespace model {
 
+// Здесь находится описание тривиальных объектов игры, таких как координаты,
+// точки, прямоугольники и т. д.
+
 using namespace std::literals;
 
 using Dimension = double;

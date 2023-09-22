@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "../../lib/model/game_session.h"
+#include "../../lib/model/retired_dog.h"
 #include "../../lib/util/tagged.h"
 #include "player.h"
 #include "token.h"
@@ -26,10 +27,17 @@ class PlayersTable {
   Players GetPlayers() const;
   Players GetPlayersByGameSessionId(
       const model::GameSession::Id& game_session_id) const;
-  Player* GetPlayerByToken(const Token& token) noexcept;
-  const Player* GetPlayerByToken(const Token& token) const noexcept;
-  std::pair<Token, const Player*> AddPlayer(
-      model::GameSession::Id game_session_id, model::Dog::Id dog_id);
+  const Player* GetPlayerByToken(const Token& token) const;
+  const Player* GetPlayerByGameSessionIdAndDogId(
+      const model::GameSession::Id& game_session_id,
+      const model::Dog::Id& dog_id) const;
+  const Player* AddPlayer(model::GameSession::Id game_session_id,
+                          model::Dog::Id dog_id);
+  // Добавляет уже сконструированного игрока, взятого из файла сохранения.
+  const Player* LoadPlayer(Player player);
+
+  void DeletePlayersByRetiredDogs(
+      const model::GameSession::RetiredDogs& retired_dogs);
 
  private:
   using TokenToPlayer = std::unordered_map<Token, Player, TokenHasher>;

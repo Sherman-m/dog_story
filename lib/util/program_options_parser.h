@@ -19,6 +19,8 @@ struct Args {
   std::string www_root;
   bool randomize_spawn_points = false;
   std::string tick_period;
+  std::string state_file;
+  std::string save_state_period;
 };
 
 // Считывает параметры командой строки

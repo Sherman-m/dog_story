@@ -39,19 +39,37 @@ class Dog {
 
   Road GetCurrentRoad() const noexcept;
 
-  const Bag& GetBag() const noexcept;
+  std::uint32_t GetBagCapacity() const noexcept;
 
-  std::uint32_t GetScore() const noexcept;
+  const Bag& GetBag() const noexcept;
 
   // Кладет предмет в рюкзак при условии, что рюкзак не заполнен. Если рюкзак
   // заполнен, то возвращает false.
   bool PutInBag(const LostObject& lost_object);
 
+  // Очищает рюкзак, и вызывает AddScore().
+  void HandOverLoot();
+
+  std::uint32_t GetScore() const noexcept;
+
+  void AddScore(std::uint32_t points);
+
+  // Возвращает количество миллисекунд, прошедшее с момента входа в игру.
+  Milliseconds GetTimeInGame() const noexcept;
+
+  void AddTimeInGame(Milliseconds time_delta);
+
+  // Возвращает момент времени, когда скорость собаки стала равна нулю.
+  Milliseconds GetIdleTime() const noexcept;
+
+  void AddIdleTime(Milliseconds time_delta);
+
+  void ResetIdleTime();
+
+  bool IsMovingNow() const noexcept;
+
   // Обновляет позицию собаки.
   void UpdatePosition(const Map* map, Milliseconds time_delta);
-
-  // Очищает рюкзак, и увеличивает поле score_.
-  void HandOverLoot();
 
   void SetSpeed(const Speed& speed);
 
@@ -74,8 +92,11 @@ class Dog {
   Speed speed_{0, 0};
   Direction direction_{Direction::kNorth};
   Road curr_road_;
+  std::uint32_t bag_capacity_ = 3;
   Bag bag_;
   std::uint32_t score_ = 0;
+  Milliseconds time_in_game_{0};
+  Milliseconds idle_time_{0};
 };
 
 }  // namespace model

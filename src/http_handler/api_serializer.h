@@ -1,6 +1,7 @@
 #pragma once
 
 #include <boost/json.hpp>
+#include <chrono>
 #include <string>
 
 #include "../../lib/json_loader/loot_types_storage.h"
@@ -13,8 +14,10 @@ namespace json = boost::json;
 
 using namespace std::literals;
 
-// Отвечает за сериализацию ответа в JSON-формата.
+// Отвечает за сериализацию ответа в JSON-формат.
 struct ApiSerializer {
+  using Seconds = std::chrono::seconds;
+
   ApiSerializer() = delete;
   ApiSerializer(ApiSerializer&) = delete;
   ApiSerializer& operator=(ApiSerializer&) = delete;
@@ -22,7 +25,7 @@ struct ApiSerializer {
   ApiSerializer& operator=(ApiSerializer&&) = delete;
 
   // GetJson(Roads|Buildings|Offices|DogBag|Loot|Players) отвечают за приведение
-  // массива объектов (Roads|Buildings|Offices) к json::object или json::array
+  // массива объектов (Roads|Buildings|Offices) к json::object или json::array.
   static json::array GetJsonRoads(const model::Map::Roads& roads);
   static json::array GetJsonBuildings(const model::Map::Buildings& buildings);
   static json::array GetJsonOffices(const model::Map::Offices& offices);
@@ -32,7 +35,7 @@ struct ApiSerializer {
                                      const app::PlayersTable::Players& players);
 
   // Serialized(Map|Maps|Player|Players|JoinResponse|Error) отвечают за создание
-  // сериализованных данных для последующей отправки клиенту
+  // сериализованных данных для последующей отправки клиенту.
   static std::string SerializeMap(const model::Map* map);
   static std::string SerializeMaps(const model::Game::Maps& maps);
   static std::string SerializePlayer(const app::Player* player);
@@ -41,8 +44,9 @@ struct ApiSerializer {
       const app::PlayersTable::Players& players);
   static std::string SerializeState(const model::GameSession* game_session,
                                     const app::PlayersTable::Players& players);
-  static std::string SerializeJoinResponse(
-      const std::pair<app::Token, const app::Player*>& join_response);
+  static std::string SerializeJoinResponse(const app::Player* player);
+  static std::string SerializeRecordsResponse(
+      const model::GameSession::RetiredDogs& retired_dogs);
   static std::string SerializeError(std::string_view code,
                                     std::string_view message);
 };

@@ -14,13 +14,10 @@ const StrandStorage::Strand* StrandStorage::GetStrand(
 
 // При добавлении игровой сессии генерирует нового последовательного
 // исполнителя.
-const StrandStorage::Strand* StrandStorage::AddStrand(
-    const model::GameSession::Id& game_session_id) {
+void StrandStorage::AddStrand(const model::GameSession::Id& game_session_id) {
   using namespace std::literals;
   try {
-    auto [it, inserted] =
-        storage_.emplace(game_session_id, net::make_strand(ioc_));
-    return &it->second;
+    storage_.emplace(game_session_id, net::make_strand(ioc_));
   } catch (...) {
     throw;
   }

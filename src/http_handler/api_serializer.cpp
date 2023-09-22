@@ -158,12 +158,25 @@ std::string ApiSerializer::SerializeState(
   return json::serialize(game_session_info);
 }
 
-std::string ApiSerializer::SerializeJoinResponse(
-    const std::pair<app::Token, const app::Player*>& join_response) {
+std::string ApiSerializer::SerializeJoinResponse(const app::Player* player) {
   json::object join_response_info;
-  join_response_info["authToken"s] = *join_response.first;
-  join_response_info["playerId"s] = *join_response.second->GetId();
+  join_response_info["authToken"s] = *player->GetToken();
+  join_response_info["playerId"s] = *player->GetId();
   return json::serialize(join_response_info);
+}
+
+std::string ApiSerializer::SerializeRecordsResponse(
+    const model::GameSession::RetiredDogs& retired_dogs) {
+  json::array records_info;
+  for (auto& dog : retired_dogs) {
+    json::object retired_dog_info;
+    retired_dog_info["name"s] = dog.GetName();
+    retired_dog_info["score"s] = dog.GetScore();
+    retired_dog_info["playTime"s] =
+        std::chrono::duration_cast<Seconds>(dog.GetPlayTime()).count();
+    records_info.push_back(retired_dog_info);
+  }
+  return json::serialize(records_info);
 }
 
 std::string ApiSerializer::SerializeError(std::string_view code,

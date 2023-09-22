@@ -6,6 +6,7 @@
 #include <boost/beast/http.hpp>
 #include <boost/json.hpp>
 #include <boost/thread.hpp>
+#include <chrono>
 
 #include "../../lib/util/sdk.h"
 #include "../logger/logger.h"
@@ -21,8 +22,6 @@ namespace http = beast::http;
 
 namespace json = boost::json;
 
-namespace pt = boost::posix_time;
-
 using namespace std::literals;
 
 // Логирует сетевые ошибки.
@@ -32,6 +31,9 @@ void LogError(beast::error_code ec, std::string_view where);
 // Создан для уменьшения машинного кода и содержит только нешаблонные параметры.
 class SessionBase {
  public:
+  using Milliseconds = std::chrono::milliseconds;
+  using Clock = std::chrono::steady_clock;
+
   SessionBase(const SessionBase&) = delete;
   SessionBase& operator=(const SessionBase&) = delete;
 
@@ -46,12 +48,13 @@ class SessionBase {
   // Отправляет клиенту ответ. Логирует об окончании формирования ответа.
   template <typename Body, typename Fields>
   void Write(http::response<Body, Fields>&& response,
-             const pt::ptime response_start) {
-    const pt::ptime response_end = pt::microsec_clock::local_time();
+             const Clock::time_point response_start) {
+    Clock::time_point response_end = Clock::now();
     logger::Log(
         json::value{
-            {"response_time"s,
-             (response_end - response_start).total_milliseconds()},
+            {"response_time"s, std::chrono::duration_cast<Milliseconds>(
+                                   response_end - response_start)
+                                   .count()},
             {"code"s, response.result_int()},
             {"content_type"s, (response[http::field::content_type] != ""sv)
                                   ? response[http::field::content_type]
@@ -106,7 +109,7 @@ class Session : public SessionBase,
   // Устанавливает время начала формирования ответа и обрабатывает запрос
   // клиента.
   void HandleRequest(HttpRequest&& request) override {
-    pt::ptime start = pt::microsec_clock::local_time();
+    Clock::time_point start = Clock::now();
     request_handler_(std::move(request),
                      [start, self = this->shared_from_this()](auto&& response) {
                        self->Write(std::forward<decltype(response)>(response),

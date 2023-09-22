@@ -13,7 +13,12 @@ namespace util {
                               "set static files root")(
       "tick-period,t", po::value(&args.tick_period)->value_name("milliseconds"),
       "set tick period")("randomize-spawn-points",
-                         "spawn dogs at random positions");
+                         "spawn dogs at random positions")(
+      "state-file", po::value(&args.state_file)->value_name("file"),
+      "set path to save file")(
+      "save-state-period",
+      po::value(&args.save_state_period)->value_name("milliseconds"),
+      "set save state period");
 
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, description), vm);

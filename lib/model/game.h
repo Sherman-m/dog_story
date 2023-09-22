@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <chrono>
 #include <stdexcept>
 #include <unordered_map>
@@ -11,6 +12,7 @@
 #include "loot_generator.h"
 #include "lost_object.h"
 #include "map.h"
+#include "retired_dog.h"
 
 namespace model {
 
@@ -27,27 +29,46 @@ class Game {
  public:
   using Maps = std::vector<Map>;
   using GameSessions = std::vector<GameSession*>;
+  using ConstGameSessions = std::vector<const GameSession*>;
   using Milliseconds = std::chrono::milliseconds;
 
   explicit Game(LootGenerator loot_generator);
 
   const Maps& GetMaps() const noexcept;
 
-  const Map* GetMapById(const Map::Id& id) const noexcept;
+  // Ищет игровую карту по ее id и возвращает указатель на эту карту.
+  // Если карты с таким id не существует, то возвращает nullptr.
+  const Map* GetMapById(const Map::Id& id) const;
 
   void AddMap(Map map);
 
   GameSessions GetGameSessions();
+  ConstGameSessions GetGameSessions() const;
 
-  GameSession* GetGameSessionById(
-      const GameSession::Id& game_session_id) noexcept;
+  // Ищет игровую сессию по ее id и возвращает указатель на эту игровую сессию.
+  // Если игровой сессии с таким id не существует, то возвращает nullptr;
+  GameSession* GetGameSessionById(const GameSession::Id& game_session_id);
+  const GameSession* GetGameSessionById(
+      const GameSession::Id& game_session_id) const;
 
-  GameSession* GetGameSessionByMapId(const Map::Id& map_id) noexcept;
+  // Находит первую попавшеюся игровую сессию, id карты которой равно map_id, и
+  // возвращает указатель на эту игровую сессию.
+  // В случае неудачи возвращает nullptr.
+  GameSession* GetFirstGameSessionByMapId(const Map::Id& map_id);
+  const GameSession* GetFirstGameSessionByMapId(const Map::Id& map_id) const;
 
+  GameSessions GetAllGameSessionsByMapId(const Map::Id& map_id);
+  ConstGameSessions GetAllGameSessionsByMapId(const Map::Id& map_id) const;
+
+  // Конструирует новую игровую сессию в game_session_id_to_game_session и
+  // возвращает указатель на этот сконструированный объект.
   GameSession* AddGameSession(std::string game_session_name, Map::Id map_id);
 
-  void UpdateGameSession(const GameSession::Id& game_session_id,
-                         Milliseconds time_delta);
+  // Добавляет уже сконструированную игровую сессию, взятую из файла сохранения.
+  GameSession* LoadGameSession(GameSession game_session);
+
+  GameSession::RetiredDogs UpdateGameSession(
+      const GameSession::Id& game_session_id, Milliseconds time_delta);
 
   Dog* AddDogInGameSession(const GameSession::Id& game_session_id,
                            std::string dog_name,

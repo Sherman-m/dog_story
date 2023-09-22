@@ -3,12 +3,14 @@
 namespace model {
 
 Map::Map(Map::Id id, std::string name, const Speed& dog_speed,
-         std::uint32_t num_of_loot_types, std::uint32_t bag_capacity) noexcept
+         std::uint32_t num_of_loot_types, std::uint32_t bag_capacity,
+         Milliseconds dog_retirement_time)
     : id_(std::move(id)),
       name_(std::move(name)),
       dog_speed_(dog_speed),
       num_of_loot_types_(num_of_loot_types),
-      bag_capacity_(bag_capacity) {}
+      bag_capacity_(bag_capacity),
+      dog_retirement_time_(dog_retirement_time) {}
 
 const Map::Id& Map::GetId() const noexcept { return id_; };
 
@@ -21,6 +23,10 @@ const Map::Buildings& Map::GetBuildings() const noexcept { return buildings_; }
 const Map::Offices& Map::GetOffices() const noexcept { return offices_; }
 
 Speed Map::GetDogSpeed() const noexcept { return dog_speed_; }
+
+Map::Milliseconds Map::GetDogRetirementTime() const noexcept {
+  return dog_retirement_time_;
+}
 
 std::uint32_t Map::GetBagCapacity() const noexcept { return bag_capacity_; }
 
@@ -40,8 +46,8 @@ std::uint32_t Map::GetBagCapacity() const noexcept { return bag_capacity_; }
 //       границу этой дороги, и указатель на эту дорогу.
 //  4. Если никакая дорога не нашлась, возвращаем любую точку и nullptr,
 //     обозначающий, что дорога не найдена.
-std::pair<Point, const Road*> Map::GetRoadFromTo(
-    const Point& from, const Point& to) const noexcept {
+std::pair<Point, const Road*> Map::GetRoadFromTo(const Point& from,
+                                                 const Point& to) const {
   auto intersection_point = Point(std::round(from.x), std::round(from.y));
   if (auto const& it = road_intersection_points_.find(intersection_point);
       it != road_intersection_points_.end()) {

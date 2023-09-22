@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <list>
 
 #include "../util/tagged.h"
 #include "geometry.h"
@@ -11,6 +12,7 @@ namespace model {
 class LostObject {
  public:
   using Id = util::Tagged<std::uint32_t, LostObject>;
+  using Loot = std::list<LostObject>;
 
   explicit LostObject(Id id, std::uint32_t type, const Point& pos,
                       std::uint32_t value);
@@ -19,9 +21,9 @@ class LostObject {
 
   std::uint32_t GetType() const noexcept;
 
-  Point GetPosition() const noexcept;
-
   std::uint32_t GetValue() const noexcept;
+
+  Point GetPosition() const noexcept;
 
   bool IsCollected() const noexcept;
 

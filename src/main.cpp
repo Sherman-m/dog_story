@@ -7,6 +7,8 @@
 #include "../lib/util/program_options_parser.h"
 #include "../lib/util/sdk.h"
 #include "app/application.h"
+#include "app/ticker.h"
+#include "db/database.h"
 #include "http_handler/request_handler.h"
 #include "logger/logger.h"
 
@@ -31,17 +33,33 @@ void RunWorkers(std::uint32_t num_of_workers, const Fn& fn) {
   fn();
 }
 
+constexpr const char DB_URL_ENV_NAME[]{"GAME_DB_URL"};
+
+auto GetConfigForDatabase(std::uint32_t connection_count) {
+  if (const auto* url = std::getenv(DB_URL_ENV_NAME)) {
+    return db::DatabaseConfig(connection_count, [url]() {
+      return std::make_shared<pqxx::connection>(url);
+    });
+  }
+  throw std::runtime_error(DB_URL_ENV_NAME +
+                           " environment variable not found"s);
+}
+
 }  // namespace
 
 int main(int argc, const char* argv[]) {
+  using Milliseconds = std::chrono::milliseconds;
+
   try {
     // Парсинг параметром командной строки.
     if (auto args = util::ParseCommandLine(argc, argv)) {
       // Инициализация фильтра для логера.
       logger::InitLogFilter();
 
+      // Указание порта и ip-адреса, через которые сервер будет слушать запросы.
       const unsigned port = 8080;
       const auto address = net::ip::make_address("0.0.0.0"sv);
+
       // Загрузка карты из файла и построение модель игры.
       model::Game game = json_loader::LoadGame(args.value().config_file);
 
@@ -59,17 +77,71 @@ int main(int argc, const char* argv[]) {
         ioc.stop();
       });
 
+      // Установление параметра --state-file <path-to-file>.
+      // --state-file <path-to-file> задает путь к файлу, в который приложение
+      // должно сохранять свое состояние в процессе работы, а при старте —
+      // восстанавливаться.
+      //
+      //  Сценарии:
+      //   - Если параметр не задан, то игровой сервер всегда стартует с
+      //     чистого листа и не сохраняет свое состояние в файл;
+      //   - Если параметр задан:
+      //    - И по указанному пути есть файл, сервер восстанавливает свое
+      //      состояние их этого файла;
+      //    - Но файла нет, программа начинает все с чистого листа;
+      //    - При получении сигналов SIGINT и SIGTERM программа должна
+      //      сохранить свое состояние в файл.
+      std::string save_file =
+          (!args.value().state_file.empty()) ? args.value().state_file : "";
+      bool is_save_file_set = !args.value().state_file.empty();
+
       // Инициализация фасада из модуля app.
-      std::chrono::milliseconds tick_period = 30ms;
-      if (!(args.value().tick_period.empty())) {
-        tick_period =
-            std::chrono::milliseconds(std::stol(args.value().tick_period));
-      }
       auto application = std::make_shared<app::Application>(
-          ioc, game, tick_period, !(args.value().tick_period.empty()));
+          ioc, game, save_file, is_save_file_set, GetConfigForDatabase(num_threads));
+
+      // Установление настроек таймера. Если параметр tick_period задан, то
+      // создается объект app::Ticker, который будет отвечать за обновление и
+      // сохранения состояния игровых сессий.
+      Milliseconds tick_period =
+          (!args.value().tick_period.empty())
+              ? Milliseconds(std::stol(args.value().tick_period))
+              : 30ms;
+      bool is_ticker_set = !args.value().tick_period.empty();
+      if (is_ticker_set) {
+        // Установление параметра --save-state-period <gaming-time-in-ms>.
+        // --save-state-period <gaming-time-in-ms> задает период автоматического
+        // сохранения состояния сервера.
+        //
+        //  Сценарии:
+        //   - Если параметр не задан, состояние должно сохраняться
+        //   автоматически
+        //     только перед завершением работы сервера, когда ему направлены
+        //     сигналы SIGINT и SIGTERM;
+        //   - Если параметр --state-file не задан, то этот параметр
+        //     игнорируется.
+        Milliseconds save_state_period =
+            (!args.value().save_state_period.empty())
+                ? Milliseconds(std::stol(args.value().save_state_period))
+                : 30ms;
+        bool is_save_state_period_set =
+            is_save_file_set && !args.value().tick_period.empty();
+
+        auto ticker = std::make_shared<app::Ticker>(
+            ioc, tick_period, is_save_state_period_set, save_state_period,
+            [application = application->shared_from_this()](
+                Milliseconds time_delta) -> bool {
+              return application->UpdateAllGameSessions(time_delta);
+            },
+            [application = application->shared_from_this()]() -> bool {
+              return application->SaveGameState();
+            });
+        ticker->Start();
+      }
+
       // Создание обработчика HTTP-запросов и связывание его с моделью игры.
       http_handler::RequestHandler handler(application, args.value().www_root,
-                                           args.value().randomize_spawn_points);
+                                           args.value().randomize_spawn_points,
+                                           is_ticker_set);
 
       // Запуск обработчика HTTP-запросов, делегируя их обработчику запросов.
       http_server::ServeHttp(ioc, {address, port},
@@ -87,6 +159,10 @@ int main(int argc, const char* argv[]) {
       RunWorkers(std::max(1u, num_threads), [&ioc] { ioc.run(); });
       // Логирование о том, что сервер успешно завершил свою работу.
       logger::Log(json::value{{"code"s, EXIT_SUCCESS}}, "server exited"sv);
+
+      if (is_save_file_set) {
+        application->SaveGameState();
+      }
     }
     return EXIT_SUCCESS;
   } catch (const std::exception& ex) {

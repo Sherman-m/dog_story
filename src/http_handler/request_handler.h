@@ -25,7 +25,7 @@ class RequestHandler {
  public:
   explicit RequestHandler(std::shared_ptr<app::Application> application,
                           std::string www_root_path,
-                          bool randomize_spawn_points);
+                          bool randomize_spawn_points, bool ticker_is_set);
 
   RequestHandler(const RequestHandler&) = delete;
   RequestHandler& operator=(const RequestHandler&) = delete;
