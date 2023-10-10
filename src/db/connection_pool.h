@@ -11,6 +11,8 @@
 
 namespace db {
 
+// Реализация пула подключению к базе данных. Такой подход используется для
+// экономии времени подключения к базе данных.
 class ConnectionPool {
   using ConnectionPtr = std::shared_ptr<pqxx::connection>;
   using PoolType = ConnectionPool;
@@ -64,7 +66,8 @@ class ConnectionPool {
   std::mutex mutex_;
   std::condition_variable cond_var_;
   std::vector<ConnectionPtr> pool_;
-  IdOfConnectionOwnersThreads id_of_connection_owners_threads;
+  IdOfConnectionOwnersThreads id_of_connection_owners_threads;  // Guarded by
+                                                                // mutex_
   std::uint32_t used_connections_ = 0;
 };
 

@@ -25,7 +25,8 @@ struct ApiSerializer {
   ApiSerializer& operator=(ApiSerializer&&) = delete;
 
   // GetJson(Roads|Buildings|Offices|DogBag|Loot|Players) отвечают за приведение
-  // массива объектов (Roads|Buildings|Offices) к json::object или json::array.
+  // массива объектов (Roads|Buildings|Offices|Players) к json::object или
+  // json::array.
   static json::array GetJsonRoads(const model::Map::Roads& roads);
   static json::array GetJsonBuildings(const model::Map::Buildings& buildings);
   static json::array GetJsonOffices(const model::Map::Offices& offices);
@@ -34,8 +35,9 @@ struct ApiSerializer {
   static json::object GetJsonPlayers(const model::GameSession* game_session,
                                      const app::PlayersTable::Players& players);
 
-  // Serialized(Map|Maps|Player|Players|JoinResponse|Error) отвечают за создание
-  // сериализованных данных для последующей отправки клиенту.
+  // Serialized(Map|Maps|Player|Players|JoinResponse|RecordResponse|Error)
+  // отвечают за создание сериализованных данных для последующей отправки
+  // клиенту.
   static std::string SerializeMap(const model::Map* map);
   static std::string SerializeMaps(const model::Game::Maps& maps);
   static std::string SerializePlayer(const app::Player* player);

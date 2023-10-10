@@ -17,6 +17,8 @@ struct DatabaseConfig {
   ConnectionFactory connection_factory;
 };
 
+// Отвечает за взаимодействие с базой данных. Отвечает за создание UnitOfWork и
+// является владельцем ConnectionPool.
 class Database {
  public:
   template <typename ConnectionFactory>

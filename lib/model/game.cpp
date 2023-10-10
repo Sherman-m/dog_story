@@ -151,6 +151,9 @@ GameSession* Game::LoadGameSession(model::GameSession game_session) {
 // Для каждой игровой сессии вычисляет число потерянных вещей, которые нужно
 // добавить в игровую сессию, и передает эту информацию в
 // game_session->UpdateSession.
+// game_session->UpdateSession возвращает список
+// "усташих" игроков (игроков, которые бездействовали больше заданного на карте
+// времени). Этот список "уставших" игроков возвращается из этой функции.
 GameSession::RetiredDogs Game::UpdateGameSession(
     const GameSession::Id& game_session_id, Game::Milliseconds time_delta) {
   using namespace std::chrono;

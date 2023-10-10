@@ -15,6 +15,7 @@ using pqxx::operator"" _zv;
 
 using RetiredPlayerId = util::TaggedUUID<model::RetiredDog>;
 
+// Представляет собой реализацию паттерна Repository для объектов RetiredPlayers
 class RetiredPlayersRepository {
  public:
   using Milliseconds = std::chrono::milliseconds;

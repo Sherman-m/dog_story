@@ -130,8 +130,10 @@ class Application : public std::enable_shared_from_this<Application> {
   // Восстанавливает состояние игры их kSaveFile.
   void LoadGameState();
 
+  // Сохранение "уставших" игроков в базу данных.
   void SaveRetiredPlayers(const model::GameSession::RetiredDogs& retired_dogs);
 
+  // Загрузка "уставших" игроков из базы данных.
   model::GameSession::RetiredDogs GetRetiredPlayers(std::uint32_t offset,
                                                     std::uint32_t max_items);
 

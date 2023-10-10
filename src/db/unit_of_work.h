@@ -7,6 +7,8 @@
 
 namespace db {
 
+// Реализация паттерна UnitOfWork.
+// Уникально владеет подключением к базе данных.
 class UnitOfWork {
  public:
   explicit UnitOfWork(ConnectionPool::ConnectionWrapper&& connection);

@@ -35,6 +35,8 @@ void RunWorkers(std::uint32_t num_of_workers, const Fn& fn) {
 
 constexpr const char DB_URL_ENV_NAME[]{"GAME_DB_URL"};
 
+// Считывает переменную окружения GAME_DB_URL и вовращает DatabaseConfig.
+// Используется при конструировании объекта Application.
 auto GetConfigForDatabase(std::uint32_t connection_count) {
   if (const auto* url = std::getenv(DB_URL_ENV_NAME)) {
     return db::DatabaseConfig(connection_count, [url]() {
@@ -97,7 +99,8 @@ int main(int argc, const char* argv[]) {
 
       // Инициализация фасада из модуля app.
       auto application = std::make_shared<app::Application>(
-          ioc, game, save_file, is_save_file_set, GetConfigForDatabase(num_threads));
+          ioc, game, save_file, is_save_file_set,
+          GetConfigForDatabase(num_threads));
 
       // Установление настроек таймера. Если параметр tick_period задан, то
       // создается объект app::Ticker, который будет отвечать за обновление и

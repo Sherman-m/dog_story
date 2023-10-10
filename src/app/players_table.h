@@ -15,7 +15,7 @@ namespace app {
 
 using namespace std::literals;
 
-// Содержит информацию обо всех игроках.
+// Содержит информацию обо всех активных игроках.
 class PlayersTable {
  public:
   using Players = std::vector<const Player*>;
@@ -36,6 +36,8 @@ class PlayersTable {
   // Добавляет уже сконструированного игрока, взятого из файла сохранения.
   const Player* LoadPlayer(Player player);
 
+  // После обновления состояния игровой сессии класс Application вызывает эту
+  // функцию для удаления "уставших" игроков из списка активных игроков.
   void DeletePlayersByRetiredDogs(
       const model::GameSession::RetiredDogs& retired_dogs);
 

@@ -202,10 +202,8 @@ GameSession::RetiredDogs GameSession::UpdateSession(const Map* map,
     if (!dog.IsMovingNow()) {
       dog.AddIdleTime(time_delta);
       if (dog.GetIdleTime() >= map->GetDogRetirementTime()) {
-        retired_dogs.emplace_back(
-            dog_id, dog.GetName(), dog.GetScore(),
-            dog.GetTimeInGame(),
-            id_);
+        retired_dogs.emplace_back(dog_id, dog.GetName(), dog.GetScore(),
+                                  dog.GetTimeInGame(), id_);
       }
     } else {
       dog.UpdatePosition(map, time_delta);

@@ -55,9 +55,7 @@ void Dog::HandOverLoot() {
   bag_.clear();
 }
 
-Dog::Milliseconds Dog::GetTimeInGame() const noexcept {
-  return time_in_game_;
-}
+Dog::Milliseconds Dog::GetTimeInGame() const noexcept { return time_in_game_; }
 
 void Dog::AddTimeInGame(model::Dog::Milliseconds time_delta) {
   time_in_game_ += time_delta;
