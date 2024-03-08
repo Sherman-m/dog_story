@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 
 clang-format --style=Google -i lib/json_loader/*
 clang-format --style=Google -i lib/model/*
