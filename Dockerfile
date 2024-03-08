@@ -46,8 +46,9 @@ RUN groupadd -r www \
  && useradd -r -g www www \
  && usermod -a -G syslog www
 
-## Изменение прав владения директорией /app
-RUN chown www /app
+## Изменение прав владения директориями /app/ и /app/save_files/ 
+RUN chown www /app \ 
+ && chown www /app/save_files 
 
 ## Переключение на пользователя www
 USER www
