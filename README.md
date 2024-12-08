@@ -57,7 +57,7 @@
 **docker**-контейнер с СУБД `postgres`. Это можно сделать следующей командой:
 
 `docker container run -d --name game_db -p 30432:5432 -e TZ=UTC -e 
-POSTGRES_PASSWORD=PASSWORD -e POSTGRES_USER=USERNAME -e POSTGRES_DB=DB_NAME 
+POSTGRES_PASSWORD=PASSWORD -e POSTGRES_USER=USERNAME -e POSTGRES_DB=DB_NAME
 postgres`
 
 Значение некоторых важных параметров:
