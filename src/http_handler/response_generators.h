@@ -137,7 +137,7 @@ http::response<Body> InternalServerError(ValueType&& message,
                                          std::uint32_t http_version,
                                          bool keep_alive,
                                          std::string_view content_type) {
-  return MakeResponse<Body>(http::status::unauthorized,
+  return MakeResponse<Body>(http::status::internal_server_error,
                             std::forward<ValueType>(message), http_version,
                             keep_alive, content_type);
 }

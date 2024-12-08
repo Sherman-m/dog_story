@@ -1,5 +1,7 @@
 #include "api_handler.h"
 
+#include <optional>
+
 namespace http_handler {
 
 // Если application->IsTickerSet() == false, то добавляется дополнительный
@@ -145,34 +147,66 @@ std::pair<ApiHandler::StringResponse, json::value> ApiHandler::ParseActionData(
   return std::make_pair(error_message, json_request_content);
 }
 
+std::optional<std::string> FindParam(std::string_view target,
+                                     const std::string& param) {
+  size_t params_start = target.find(param, target.find('?'));
+  if (params_start == std::string_view::npos) {
+    return std::nullopt;
+  }
+  size_t begin = target.find('=', params_start) + 1;
+
+  if (begin == std::string_view::npos || begin >= target.size()) {
+    return std::nullopt;
+  }
+  
+  size_t end = std::min(target.find('&', begin), target.size());
+
+  return std::string(target.begin() + begin, target.begin() + end);
+}
+
 std::pair<ApiHandler::StringResponse, json::object>
 ApiHandler::ParseRecordsData(const StringRequest& req,
                              std::uint32_t http_version,
                              bool keep_alive) const {
   StringResponse error_message;
   std::string_view target = req.target();
+
   json::object request_data;
-  auto param_pos = target.find("start"sv, target.find('?'));
-  request_data["start"s] =
-      (param_pos != std::string_view::npos)
-          ? std::stoi(
-                std::string(target.begin() + target.find('=', param_pos) + 1,
-                            target.begin() + target.find('&', param_pos)))
-          : 0;
-  param_pos = target.find("maxItems"sv, param_pos);
-  request_data["maxItems"s] =
-      (param_pos != std::string_view::npos)
-          ? std::stoi(std::string(
-                target.begin() + target.find('=', param_pos) + 1, target.end()))
-          : 50;
-  if (request_data["maxItems"s].as_int64() > 100) {
-    error_message = std::move(
-        ApiBadRequest(ApiSerializer::SerializeError(
-                          common_response_codes::kInvalidArgument,
-                          "Failed to parse records request parameters"sv),
-                      http_version, keep_alive));
-    return std::make_pair(error_message, json::object());
+  auto start_param_opt = FindParam(target, "start"s);
+  if (start_param_opt.has_value()) {
+    try {
+      request_data["start"s] = std::stoll(start_param_opt.value());
+    } catch (std::exception& ex) {
+        logger::Log(
+            json::value{{"code"s, EXIT_FAILURE}, {"exception"s, ex.what()}},
+            "error");
+        error_message = std::move(ApiBadRequest(
+            ApiSerializer::SerializeError(common_response_codes::kInvalidArgument,
+                                          "Failed to parse start parameter"sv),
+            http_version, keep_alive));
+        return std::make_pair(error_message, json::object());
+    }
   }
+
+  auto max_items_opt = FindParam(target, "maxItems"s);
+  if (max_items_opt.has_value()) {
+    try {
+      request_data["maxItems"s] = std::stoll(max_items_opt.value());
+      if (request_data["maxItems"s].as_int64() > 100) {
+        throw std::runtime_error("maxItems greater than 100"s);
+      }
+    } catch (std::exception& ex) {
+        logger::Log(
+            json::value{{"code"s, EXIT_FAILURE}, {"exception"s, ex.what()}},
+            "error");
+        error_message = std::move(ApiBadRequest(
+            ApiSerializer::SerializeError(common_response_codes::kInvalidArgument,
+                                          "Failed to parse maxItems parameter"sv),
+            http_version, keep_alive));
+        return std::make_pair(error_message, json::object());
+    }
+  }
+
   return std::make_pair(error_message, request_data);
 }
 
@@ -447,9 +481,17 @@ ApiHandler::StringResponse ApiHandler::HandleRecordsEndpoint(
   if (parse_records_data_response.first.result() == http::status::bad_request) {
     return parse_records_data_response.first;
   }
-  auto retired_dogs = application_->GetRetiredPlayers(
-      parse_records_data_response.second.at("start"s).as_int64(),
-      parse_records_data_response.second.at("maxItems"s).as_int64());
+  const auto start_param =
+      parse_records_data_response.second.contains("start"s)
+          ? parse_records_data_response.second.at("start"s).as_int64()
+          : 0;
+  const auto max_items_param =
+      parse_records_data_response.second.contains("maxItems"s)
+          ? parse_records_data_response.second.at("maxItems"s).as_int64()
+          : 50;
+
+  auto retired_dogs =
+      application_->GetRetiredPlayers(start_param, max_items_param);
   return ApiOkRequest(ApiSerializer::SerializeRecordsResponse(retired_dogs),
                       http_version, keep_alive);
 }

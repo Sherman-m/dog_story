@@ -11,6 +11,7 @@
 #include "../app/application.h"
 #include "../app/player.h"
 #include "../app/players_table.h"
+#include "../logger/logger.h"
 #include "api_serializer.h"
 #include "response_generators.h"
 
@@ -74,18 +75,30 @@ class ApiHandler {
   // Иначе отправляет BadRequest.
   template <typename Send>
   void operator()(StringRequest&& req, Send&& send) {
-    std::string target = ClearTarget(req.target());
-    if (auto it = handler_storage_.find(target); it != handler_storage_.end()) {
-      auto handler = it->second;
-      return send(std::move((this->*handler)(std::move(req))));
-    } else if (target.starts_with(endpoint_storage::kApiV1Map)) {
-      auto handler = handler_storage_[std::string(endpoint_storage::kApiV1Map)];
-      return send(std::move((this->*handler)(std::move(req))));
+    try {
+      std::string target = ClearTarget(req.target());
+      if (auto it = handler_storage_.find(target);
+          it != handler_storage_.end()) {
+        auto handler = it->second;
+        return send(std::move((this->*handler)(std::move(req))));
+      } else if (target.starts_with(endpoint_storage::kApiV1Map)) {
+        auto handler =
+            handler_storage_[std::string(endpoint_storage::kApiV1Map)];
+        return send(std::move((this->*handler)(std::move(req))));
+      }
+      return send(std::move(ApiBadRequest(
+          ApiSerializer::SerializeError(common_response_codes::kBadRequest,
+                                        "Invalid endpoint"sv),
+          req.version(), req.keep_alive())));
+    } catch (std::exception& ex) {
+      logger::Log(
+          json::value{{"code"s, EXIT_FAILURE}, {"exception"s, ex.what()}},
+          "Internel Server Error"sv);
+      return send(std::move(ApiInternalServerError(
+          ApiSerializer::SerializeError(common_response_codes::kServerError,
+                                        "InternalServerError"),
+          req.version(), req.keep_alive())));
     }
-    return send(std::move(ApiBadRequest(
-        ApiSerializer::SerializeError(common_response_codes::kBadRequest,
-                                      "Invalid endpoint"sv),
-        req.version(), req.keep_alive())));
   }
 
  private:
